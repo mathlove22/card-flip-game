@@ -1,0 +1,13 @@
+{
+    "name": "card-flip-game",
+    "version": "1.0.0",
+    "description": "실시간 카드 뒤집기 게임",
+    "main": "server.js",
+    "scripts": {
+        "start": "node server.js"
+    },
+    "dependencies": {
+        "express": "^4.18.2",
+        "socket.io": "^4.6.1"
+    }
+}
