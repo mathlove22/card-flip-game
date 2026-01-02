@@ -23,7 +23,9 @@ io.on('connection', (socket) => {
         rooms.set(roomCode, {
             board: initialBoard,
             players: [socket.id],
-            clicks: { [socket.id]: 0 }
+            clicks: { [socket.id]: 0 },
+            gameStarted: false,
+            timer: null
         });
 
         socket.join(roomCode);
@@ -63,7 +65,41 @@ io.on('connection', (socket) => {
         // 상대방에게 알림
         socket.to(roomCode).emit('opponentJoined');
 
+        // 두 명 다 참가
+        io.to(roomCode).emit('bothPlayersReady');
+
         console.log(`${socket.id}가 방 ${roomCode}에 참가`);
+    });
+
+    // 게임 시작
+    socket.on('startGame', (roomCode) => {
+        const room = rooms.get(roomCode);
+
+        if (!room) {
+            socket.emit('error', '방을 찾을 수 없습니다.');
+            return;
+        }
+
+        if (room.players.length < 2) {
+            socket.emit('error', '두 명의 플레이어가 필요합니다.');
+            return;
+        }
+
+        if (room.gameStarted) {
+            socket.emit('error', '이미 게임이 시작되었습니다.');
+            return;
+        }
+
+        // 게임 시작
+        room.gameStarted = true;
+        io.to(roomCode).emit('gameStarted');
+
+        console.log(`방 ${roomCode}: 게임 시작`);
+
+        // 30초 타이머 시작
+        room.timer = setTimeout(() => {
+            endGame(roomCode);
+        }, 30000);
     });
 
     // 카드 뒤집기
@@ -72,6 +108,11 @@ io.on('connection', (socket) => {
 
         if (!room) {
             socket.emit('error', '방을 찾을 수 없습니다.');
+            return;
+        }
+
+        if (!room.gameStarted) {
+            socket.emit('error', '게임이 아직 시작되지 않았습니다.');
             return;
         }
 
@@ -92,6 +133,81 @@ io.on('connection', (socket) => {
         console.log(`방 ${roomCode}: 칸 ${index} 뒤집힘`);
     });
 
+    // 게임 종료 함수
+    function endGame(roomCode) {
+        const room = rooms.get(roomCode);
+        if (!room || !room.gameStarted) return;
+
+        room.gameStarted = false;
+
+        // 점수 계산
+        const redScore = room.board.filter(cell => cell === 0).length;
+        const blueScore = 36 - redScore;
+
+        const p1Clicks = room.clicks[room.players[0]] || 0;
+        const p2Clicks = room.clicks[room.players[1]] || 0;
+
+        let winner = '';
+
+        // 승자 결정
+        if (redScore > blueScore) {
+            winner = 'red';
+        } else if (blueScore > redScore) {
+            winner = 'blue';
+        } else {
+            // 동점일 경우 클릭 수가 적은 쪽이 승리
+            if (p1Clicks < p2Clicks) {
+                winner = 'red';
+            } else if (p2Clicks < p1Clicks) {
+                winner = 'blue';
+            } else {
+                winner = 'tie';
+            }
+        }
+
+        // 게임 결과 전송
+        io.to(roomCode).emit('gameOver', {
+            winner,
+            redScore,
+            blueScore,
+            p1Clicks,
+            p2Clicks
+        });
+
+        console.log(`방 ${roomCode}: 게임 종료 - 승자: ${winner}`);
+    }
+
+    // 재대결
+    socket.on('rematch', (roomCode) => {
+        const room = rooms.get(roomCode);
+
+        if (!room) {
+            socket.emit('error', '방을 찾을 수 없습니다.');
+            return;
+        }
+
+        // 타이머 초기화
+        if (room.timer) {
+            clearTimeout(room.timer);
+            room.timer = null;
+        }
+
+        // 보드 및 게임 상태 초기화
+        room.board = Array(36).fill(0).map(() => Math.random() > 0.5 ? 0 : 1);
+        room.clicks = {};
+        room.players.forEach(playerId => {
+            room.clicks[playerId] = 0;
+        });
+        room.gameStarted = false;
+
+        // 모든 플레이어에게 재대결 알림
+        io.to(roomCode).emit('rematchStarted', {
+            board: room.board
+        });
+
+        console.log(`방 ${roomCode}: 재대결 시작`);
+    });
+
     // 연결 해제
     socket.on('disconnect', () => {
         console.log('사용자 연결 해제:', socket.id);
@@ -99,6 +215,11 @@ io.on('connection', (socket) => {
         // 해당 플레이어가 있는 방 찾기
         for (const [roomCode, room] of rooms.entries()) {
             if (room.players.includes(socket.id)) {
+                // 타이머 정리
+                if (room.timer) {
+                    clearTimeout(room.timer);
+                }
+
                 socket.to(roomCode).emit('opponentLeft');
                 rooms.delete(roomCode);
                 console.log(`방 ${roomCode} 삭제됨`);

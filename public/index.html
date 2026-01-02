@@ -64,6 +64,11 @@
             transform: translateY(0);
         }
 
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
         .room-input {
             padding: 12px;
             margin: 10px 0;
@@ -91,6 +96,25 @@
             font-family: monospace;
         }
 
+        .player-indicator {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 15px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+            font-size: 20px;
+            font-weight: bold;
+        }
+
+        .player-indicator.p1 {
+            background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+        }
+
+        .player-indicator.p2 {
+            background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+        }
+
         .status {
             text-align: center;
             padding: 10px;
@@ -107,6 +131,36 @@
         .status.ready {
             background: #d4edda;
             color: #155724;
+        }
+
+        .status.playing {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+
+        .timer {
+            text-align: center;
+            font-size: 48px;
+            font-weight: bold;
+            color: #667eea;
+            margin: 15px 0;
+        }
+
+        .timer.warning {
+            color: #e74c3c;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
         }
 
         .score-board {
@@ -147,6 +201,7 @@
             grid-template-columns: repeat(6, 1fr);
             gap: 8px;
             margin-bottom: 20px;
+            perspective: 1000px;
         }
 
         .cell {
@@ -154,43 +209,46 @@
             border: none;
             border-radius: 8px;
             cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            transition: transform 0.2s ease;
             position: relative;
+            transform-style: preserve-3d;
         }
 
-        .cell:hover {
+        .cell:hover:not(.disabled) {
             transform: scale(1.05);
-            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.2);
         }
 
-        .cell:active {
-            transform: scale(0.95);
+        .cell.disabled {
+            cursor: not-allowed;
+            opacity: 0.7;
+        }
+
+        .cell.flipping {
+            animation: flip 0.6s ease-in-out;
+        }
+
+        @keyframes flip {
+            0% {
+                transform: rotateY(0deg);
+            }
+
+            50% {
+                transform: rotateY(90deg);
+            }
+
+            100% {
+                transform: rotateY(0deg);
+            }
         }
 
         .cell.red {
             background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+            box-shadow: 0 4px 6px rgba(231, 76, 60, 0.3);
         }
 
         .cell.blue {
             background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
-        }
-
-        .cell.flash {
-            animation: flash 0.3s ease;
-        }
-
-        @keyframes flash {
-
-            0%,
-            100% {
-                transform: scale(1);
-            }
-
-            50% {
-                transform: scale(1.15);
-                box-shadow: 0 0 20px rgba(255, 255, 255, 0.8);
-            }
+            box-shadow: 0 4px 6px rgba(52, 152, 219, 0.3);
         }
 
         .stats {
@@ -214,6 +272,68 @@
             text-align: center;
         }
 
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            z-index: 1000;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 20px;
+            text-align: center;
+            max-width: 400px;
+            animation: slideIn 0.3s ease;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateY(-50px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .winner-text {
+            font-size: 36px;
+            font-weight: bold;
+            margin-bottom: 20px;
+        }
+
+        .winner-text.win {
+            color: #28a745;
+        }
+
+        .winner-text.lose {
+            color: #e74c3c;
+        }
+
+        .winner-text.tie {
+            color: #ffc107;
+        }
+
+        .result-details {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 30px;
+        }
+
         @media (max-width: 600px) {
             .container {
                 padding: 20px;
@@ -229,6 +349,10 @@
 
             .room-code {
                 font-size: 24px;
+            }
+
+            .timer {
+                font-size: 36px;
             }
         }
     </style>
@@ -255,7 +379,13 @@
                 <div style="font-size: 12px; margin-top: 5px; color: #856404;">친구에게 이 코드를 공유하세요!</div>
             </div>
 
+            <div id="playerIndicator" class="player-indicator"></div>
+
             <div id="statusMsg" class="status waiting">상대방을 기다리는 중...</div>
+
+            <button id="startBtn" class="btn hidden" onclick="startGame()">게임 시작!</button>
+
+            <div id="timerDisplay" class="timer hidden">30</div>
 
             <div class="score-board">
                 <div class="player">
@@ -279,12 +409,25 @@
         </div>
     </div>
 
+    <!-- 게임 결과 모달 -->
+    <div id="resultModal" class="modal">
+        <div class="modal-content">
+            <div id="winnerText" class="winner-text"></div>
+            <div id="resultDetails" class="result-details"></div>
+            <button class="btn" onclick="rematch()">Re-match?</button>
+            <button class="btn" onclick="leaveGame()" style="background: #6c757d;">나가기</button>
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
         const socket = io();
         let currentRoomCode = null;
         let playerNumber = null;
         let board = [];
+        let gameStarted = false;
+        let timerInterval = null;
+        let timeLeft = 30;
 
         // 방 생성
         function createRoom() {
@@ -299,6 +442,17 @@
                 return;
             }
             socket.emit('joinRoom', roomCode);
+        }
+
+        // 게임 시작
+        function startGame() {
+            socket.emit('startGame', currentRoomCode);
+        }
+
+        // 재대결
+        function rematch() {
+            socket.emit('rematch', currentRoomCode);
+            document.getElementById('resultModal').classList.remove('show');
         }
 
         // 게임 나가기
@@ -324,6 +478,7 @@
             document.getElementById('game').classList.remove('hidden');
             document.getElementById('roomCodeDisplay').textContent = roomCode;
 
+            updatePlayerIndicator();
             initBoard();
         });
 
@@ -336,17 +491,74 @@
             document.getElementById('lobby').classList.add('hidden');
             document.getElementById('game').classList.remove('hidden');
             document.getElementById('roomCodeDisplay').textContent = roomCode;
-            document.getElementById('statusMsg').textContent = '게임 시작!';
-            document.getElementById('statusMsg').className = 'status ready';
 
+            updatePlayerIndicator();
             initBoard();
         });
 
         // 상대방 참가
         socket.on('opponentJoined', () => {
-            document.getElementById('statusMsg').textContent = '게임 시작!';
+            document.getElementById('statusMsg').textContent = '상대방이 참가했습니다!';
+            document.getElementById('statusMsg').className = 'status ready';
+            document.getElementById('startBtn').classList.remove('hidden');
+        });
+
+        // 두 명 다 참가 시 호스트에게만 시작 버튼 표시
+        socket.on('bothPlayersReady', () => {
+            if (playerNumber === 1) {
+                document.getElementById('startBtn').classList.remove('hidden');
+            }
+            document.getElementById('statusMsg').textContent = '게임 시작 준비 완료!';
             document.getElementById('statusMsg').className = 'status ready';
         });
+
+        // 게임 시작됨
+        socket.on('gameStarted', () => {
+            gameStarted = true;
+            document.getElementById('statusMsg').textContent = '게임 진행 중!';
+            document.getElementById('statusMsg').className = 'status playing';
+            document.getElementById('startBtn').classList.add('hidden');
+            document.getElementById('timerDisplay').classList.remove('hidden');
+
+            startTimer();
+            enableBoard();
+        });
+
+        // 타이머 시작
+        function startTimer() {
+            timeLeft = 30;
+            updateTimerDisplay();
+
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+
+                if (timeLeft <= 10) {
+                    document.getElementById('timerDisplay').classList.add('warning');
+                }
+
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                }
+            }, 1000);
+        }
+
+        // 타이머 표시 업데이트
+        function updateTimerDisplay() {
+            document.getElementById('timerDisplay').textContent = timeLeft;
+        }
+
+        // 플레이어 표시 업데이트
+        function updatePlayerIndicator() {
+            const indicator = document.getElementById('playerIndicator');
+            if (playerNumber === 1) {
+                indicator.textContent = '당신은 빨강 (Player 1) 입니다';
+                indicator.className = 'player-indicator p1';
+            } else {
+                indicator.textContent = '당신은 파랑 (Player 2) 입니다';
+                indicator.className = 'player-indicator p2';
+            }
+        }
 
         // 보드 초기화
         function initBoard() {
@@ -355,7 +567,7 @@
 
             for (let i = 0; i < 36; i++) {
                 const cell = document.createElement('button');
-                cell.className = 'cell ' + (board[i] === 0 ? 'red' : 'blue');
+                cell.className = 'cell ' + (board[i] === 0 ? 'red' : 'blue') + ' disabled';
                 cell.onclick = () => flipCell(i);
                 cell.dataset.index = i;
                 grid.appendChild(cell);
@@ -364,8 +576,22 @@
             updateScores();
         }
 
+        // 보드 활성화
+        function enableBoard() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => cell.classList.remove('disabled'));
+        }
+
+        // 보드 비활성화
+        function disableBoard() {
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => cell.classList.add('disabled'));
+        }
+
         // 카드 뒤집기
         function flipCell(index) {
+            if (!gameStarted) return;
+
             socket.emit('flipCell', {
                 roomCode: currentRoomCode,
                 index
@@ -379,11 +605,15 @@
             const cells = document.querySelectorAll('.cell');
             const clickedCell = cells[clickedIndex];
 
-            // 색상 업데이트
-            clickedCell.className = 'cell ' + (board[clickedIndex] === 0 ? 'red' : 'blue');
-            clickedCell.classList.add('flash');
+            // 뒤집기 애니메이션
+            clickedCell.classList.add('flipping');
 
-            setTimeout(() => clickedCell.classList.remove('flash'), 300);
+            setTimeout(() => {
+                clickedCell.className = 'cell ' + (board[clickedIndex] === 0 ? 'red' : 'blue');
+                if (!gameStarted) {
+                    clickedCell.classList.add('disabled');
+                }
+            }, 300);
 
             // 클릭 수 업데이트
             const clicksArray = Object.values(clicks);
@@ -401,6 +631,52 @@
             document.getElementById('redScore').textContent = redCount;
             document.getElementById('blueScore').textContent = blueCount;
         }
+
+        // 게임 종료
+        socket.on('gameOver', ({ winner, redScore, blueScore, p1Clicks, p2Clicks }) => {
+            gameStarted = false;
+            clearInterval(timerInterval);
+            disableBoard();
+
+            const winnerText = document.getElementById('winnerText');
+            const resultDetails = document.getElementById('resultDetails');
+
+            let message = '';
+            let detailMessage = `빨강: ${redScore}점 (${p1Clicks}클릭) vs 파랑: ${blueScore}점 (${p2Clicks}클릭)`;
+
+            if (winner === 'tie') {
+                winnerText.textContent = '무승부!';
+                winnerText.className = 'winner-text tie';
+            } else if ((winner === 'red' && playerNumber === 1) || (winner === 'blue' && playerNumber === 2)) {
+                winnerText.textContent = '🎉 승리!';
+                winnerText.className = 'winner-text win';
+            } else {
+                winnerText.textContent = '😢 패배';
+                winnerText.className = 'winner-text lose';
+            }
+
+            resultDetails.textContent = detailMessage;
+            document.getElementById('resultModal').classList.add('show');
+        });
+
+        // 재대결 시작
+        socket.on('rematchStarted', ({ board: newBoard }) => {
+            board = newBoard;
+            gameStarted = false;
+            timeLeft = 30;
+
+            document.getElementById('timerDisplay').textContent = '30';
+            document.getElementById('timerDisplay').classList.remove('warning');
+            document.getElementById('timerDisplay').classList.add('hidden');
+
+            if (playerNumber === 1) {
+                document.getElementById('startBtn').classList.remove('hidden');
+            }
+            document.getElementById('statusMsg').textContent = '게임 시작 준비 완료!';
+            document.getElementById('statusMsg').className = 'status ready';
+
+            initBoard();
+        });
 
         // 상대방 나감
         socket.on('opponentLeft', () => {
