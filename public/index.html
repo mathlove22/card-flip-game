@@ -5,6 +5,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>실시간 카드 뒤집기</title>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -20,6 +21,132 @@
             justify-content: center;
             align-items: center;
             padding: 20px;
+        }
+
+        .share-section {
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 10px;
+            margin: 15px 0;
+            text-align: center;
+        }
+
+        .share-title {
+            font-size: 18px;
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+        }
+
+        .qr-container {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            display: inline-block;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        }
+
+        #qrcode {
+            display: inline-block;
+        }
+
+        .share-link-container {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 15px 0;
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+
+        .share-link {
+            flex: 1;
+            padding: 10px;
+            background: #e9ecef;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            font-size: 14px;
+            color: #495057;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: monospace;
+        }
+
+        .copy-btn {
+            padding: 10px 20px;
+            background: #28a745;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+        }
+
+        .copy-btn:hover {
+            background: #218838;
+        }
+
+        .copy-btn:active {
+            transform: scale(0.95);
+        }
+
+        .copy-btn.copied {
+            background: #17a2b8;
+        }
+
+        .share-methods {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .share-method {
+            background: white;
+            padding: 12px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .share-method-icon {
+            font-size: 24px;
+        }
+
+        .share-method-text {
+            flex: 1;
+            text-align: left;
+        }
+
+        .share-method-title {
+            font-weight: bold;
+            color: #333;
+            font-size: 14px;
+        }
+
+        .share-method-desc {
+            font-size: 12px;
+            color: #666;
+        }
+
+        @media (max-width: 600px) {
+            .share-link-container {
+                flex-direction: column;
+            }
+
+            .share-link {
+                width: 100%;
+            }
+
+            .copy-btn {
+                width: 100%;
+            }
         }
 
         .container {
@@ -373,10 +500,39 @@
 
         <!-- 게임 화면 -->
         <div id="game" class="hidden">
-            <div class="room-code-display">
-                <div style="font-size: 14px; margin-bottom: 5px;">방 코드</div>
-                <div class="room-code" id="roomCodeDisplay"></div>
-                <div style="font-size: 12px; margin-top: 5px; color: #856404;">친구에게 이 코드를 공유하세요!</div>
+            <!-- 공유 섹션 -->
+            <div class="share-section">
+                <div class="share-title">🎮 친구 초대하기</div>
+
+                <!-- QR 코드 -->
+                <div class="qr-container">
+                    <div id="qrcode"></div>
+                </div>
+                <div style="font-size: 12px; color: #666; margin-bottom: 15px;">
+                    스마트폰으로 QR코드를 스캔하세요
+                </div>
+
+                <!-- 방 코드 -->
+                <div class="share-method">
+                    <div class="share-method-icon">🔢</div>
+                    <div class="share-method-text">
+                        <div class="share-method-title">방 코드</div>
+                        <div style="font-size: 20px; font-weight: bold; color: #667eea; font-family: monospace; letter-spacing: 2px;"
+                            id="roomCodeDisplay"></div>
+                    </div>
+                </div>
+
+                <!-- 공유 링크 -->
+                <div class="share-method">
+                    <div class="share-method-icon">🔗</div>
+                    <div class="share-method-text">
+                        <div class="share-method-title">공유 링크</div>
+                        <div class="share-link-container">
+                            <div class="share-link" id="shareLink"></div>
+                            <button class="copy-btn" onclick="copyLink()">복사</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div id="playerIndicator" class="player-indicator"></div>
@@ -478,6 +634,9 @@
             document.getElementById('game').classList.remove('hidden');
             document.getElementById('roomCodeDisplay').textContent = roomCode;
 
+            // QR 코드 생성
+            generateQRCode(roomCode);
+
             updatePlayerIndicator();
             initBoard();
         });
@@ -559,6 +718,64 @@
                 indicator.className = 'player-indicator p2';
             }
         }
+
+        // QR 코드 생성
+        function generateQRCode(roomCode) {
+            const qrContainer = document.getElementById('qrcode');
+            qrContainer.innerHTML = ''; // 기존 QR 코드 제거
+
+            const gameUrl = `${window.location.origin}?room=${roomCode}`;
+
+            new QRCode(qrContainer, {
+                text: gameUrl,
+                width: 200,
+                height: 200,
+                colorDark: "#667eea",
+                colorLight: "#ffffff",
+                correctLevel: QRCode.CorrectLevel.H
+            });
+
+            // 공유 링크 표시
+            document.getElementById('shareLink').textContent = gameUrl;
+        }
+
+        // 링크 복사
+        function copyLink() {
+            const shareLink = document.getElementById('shareLink').textContent;
+
+            navigator.clipboard.writeText(shareLink).then(() => {
+                const copyBtn = document.querySelector('.copy-btn');
+                const originalText = copyBtn.textContent;
+
+                copyBtn.textContent = '✓ 복사됨!';
+                copyBtn.classList.add('copied');
+
+                setTimeout(() => {
+                    copyBtn.textContent = originalText;
+                    copyBtn.classList.remove('copied');
+                }, 2000);
+            }).catch(err => {
+                alert('링크 복사 실패. 수동으로 복사해주세요.');
+            });
+        }
+
+        // URL에서 방 코드 가져오기
+        function getRoomCodeFromURL() {
+            const urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get('room');
+        }
+
+        // 페이지 로드 시 자동 참가
+        window.addEventListener('load', () => {
+            const roomCode = getRoomCodeFromURL();
+            if (roomCode) {
+                document.getElementById('roomCodeInput').value = roomCode;
+                // 자동으로 참가 시도
+                setTimeout(() => {
+                    joinRoom();
+                }, 500);
+            }
+        });
 
         // 보드 초기화
         function initBoard() {
