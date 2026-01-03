@@ -666,6 +666,47 @@
             color: #666;
             margin-bottom: 30px;
             white-space: pre-line;
+            line-height: 1.8;
+            text-align: left;
+            padding: 0 20px;
+        }
+
+        .result-details strong {
+            color: #333;
+        }
+
+        /* 올킬 효과 */
+        @keyframes allkillFlash {
+
+            0%,
+            100% {
+                background: rgba(255, 0, 0, 0);
+            }
+
+            50% {
+                background: rgba(255, 0, 0, 0.3);
+            }
+        }
+
+        .grid.allkill {
+            animation: allkillFlash 0.5s ease 3;
+        }
+
+        .winner-text.allkill {
+            font-size: 40px;
+            animation: allkillPulse 1s ease infinite;
+        }
+
+        @keyframes allkillPulse {
+
+            0%,
+            100% {
+                transform: scale(1);
+            }
+
+            50% {
+                transform: scale(1.1);
+            }
         }
 
         @media (max-width: 600px) {
@@ -1416,6 +1457,15 @@
 
             updateScores();
             updateStatsDisplay(clicks);
+
+            // 올킬 체크 (클라이언트에서도 시각 효과를 위해 확인)
+            const colorCounts = Array(maxPlayers).fill(0);
+            board.forEach(cell => colorCounts[cell]++);
+
+            if (colorCounts.some(count => count === 36)) {
+                document.getElementById('grid').classList.add('allkill');
+                console.log('🔥 올킬 감지!');
+            }
         });
 
         function updateScores() {
@@ -1430,6 +1480,8 @@
         }
 
         socket.on('gameOver', ({ winner, scores, winType }) => {
+            console.log('게임 종료:', { winner, scores, winType });
+
             gameStarted = false;
             clearInterval(timerInterval);
             disableBoard();
@@ -1439,33 +1491,52 @@
             gamesPlayed++;
             localStorage.setItem('gamesPlayed', gamesPlayed);
 
-            // 첫 게임 후 설치 프롬프트 표시
             if (gamesPlayed === 1 && !installPromptShown) {
                 setTimeout(() => {
                     showInstallPrompt();
-                }, 5000); // 결과 확인 후 5초 뒤
+                }, 5000);
             }
 
             const winnerText = document.getElementById('winnerText');
             const resultDetails = document.getElementById('resultDetails');
 
-            let detailMessage = scores.map(s =>
-                `${colorNames[s.playerNumber - 1]} (P${s.playerNumber}): ${s.score}점 (${s.clicks}클릭)`
-            ).join('\n');
+            // 점수 내림차순 정렬
+            const sortedScores = [...scores].sort((a, b) => b.score - a.score);
+
+            // 점수 상세 정보 (순위별)
+            let detailMessage = sortedScores.map((s, index) => {
+                const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : '4️⃣';
+                const isMe = s.playerNumber === playerNumber ? ' (나)' : '';
+                return `${medal} ${colorNames[s.playerNumber - 1]}${isMe}: ${s.score}점 (${s.clicks}클릭)`;
+            }).join('\n');
+
+            const winnerColorName = winner !== 'tie' ? colorNames[winner - 1] : null;
+            const myColorName = colorNames[playerNumber - 1];
+            const isWinner = winner === playerNumber;
 
             if (winType === 'allkill') {
-                detailMessage = `🔥 올킬! ${colorNames[winner - 1]}이 모든 칸을 차지했습니다! 🔥\n\n` + detailMessage;
-            }
-
-            if (winner === playerNumber) {
-                winnerText.textContent = winType === 'allkill' ? '🎉 완벽한 승리!' : '🎉 승리!';
-                winnerText.className = 'winner-text win';
-            } else if (winner === 'tie') {
-                winnerText.textContent = '무승부!';
-                winnerText.className = 'winner-text tie';
+                if (isWinner) {
+                    winnerText.textContent = `🔥 올킬! ${myColorName} 완벽 승리!`;
+                    winnerText.className = 'winner-text win allkill';
+                } else {
+                    winnerText.textContent = `😱 ${winnerColorName} 올킬 승리`;
+                    winnerText.className = 'winner-text lose';
+                }
+                detailMessage = `🔥 ${winnerColorName}이 36칸 모두 차지!\n\n` + detailMessage;
             } else {
-                winnerText.textContent = '😢 패배';
-                winnerText.className = 'winner-text lose';
+                if (isWinner) {
+                    winnerText.textContent = `🎉 ${myColorName} 1위! (승리)`;
+                    winnerText.className = 'winner-text win';
+                } else if (winner === 'tie') {
+                    winnerText.textContent = `🤝 무승부!`;
+                    winnerText.className = 'winner-text tie';
+                } else {
+                    const myRank = sortedScores.findIndex(s => s.playerNumber === playerNumber) + 1;
+                    const rankEmoji = myRank === 2 ? '🥈' : myRank === 3 ? '🥉' : '4️⃣';
+
+                    winnerText.textContent = `${rankEmoji} ${winnerColorName} 승리! (나: ${myColorName} ${myRank}위)`;
+                    winnerText.className = 'winner-text lose';
+                }
             }
 
             resultDetails.textContent = detailMessage;
@@ -1479,6 +1550,9 @@
             document.getElementById('timerDisplay').textContent = '30';
             document.getElementById('timerDisplay').classList.remove('warning');
             document.getElementById('timerDisplay').classList.add('hidden');
+
+            // 올킬 효과 초기화
+            document.getElementById('grid').classList.remove('allkill');
 
             if (playerNumber === 1) {
                 document.getElementById('startBtn').classList.remove('hidden');

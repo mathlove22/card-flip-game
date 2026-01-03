@@ -130,18 +130,23 @@ io.on('connection', (socket) => {
             clicks: room.clicks
         });
 
-        const colorCounts = getColorCounts(room.board);
+        const colorCounts = getColorCounts(room.board, room.maxPlayers);
         if (colorCounts.some(count => count === 36)) {
             clearTimeout(room.timer);
+            console.log(`🔥 올킬 발생! 방 ${roomCode}`);
             endGame(roomCode, true);
         }
 
         console.log(`방 ${roomCode}: 칸 ${index} 뒤집힘`);
     });
 
-    function getColorCounts(board) {
-        const counts = Array(4).fill(0);
-        board.forEach(cell => counts[cell]++);
+    function getColorCounts(board, maxPlayers) {
+        const counts = Array(maxPlayers).fill(0);
+        board.forEach(cell => {
+            if (cell >= 0 && cell < maxPlayers) {
+                counts[cell]++;
+            }
+        });
         return counts;
     }
 
@@ -152,7 +157,7 @@ io.on('connection', (socket) => {
         room.gameStarted = false;
         room.gameEnded = true;
 
-        const colorCounts = getColorCounts(room.board);
+        const colorCounts = getColorCounts(room.board, room.maxPlayers);
         const scores = room.players.map((playerId, index) => ({
             playerNumber: index + 1,
             score: colorCounts[index],
@@ -170,6 +175,8 @@ io.on('connection', (socket) => {
             const finalWinner = winners.find(w => w.clicks === minClicks);
             winner = finalWinner ? finalWinner.playerNumber : 'tie';
         }
+
+        console.log(`게임 종료 - 승합: ${winner}, 올킬: ${isAllKill}`);
 
         io.to(roomCode).emit('gameOver', {
             winner,
