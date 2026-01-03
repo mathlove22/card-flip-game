@@ -1009,6 +1009,16 @@
         </div>
     </div>
 
+    <!-- 게임 결과 모달 -->
+    <div id="resultModal" class="modal">
+        <div class="modal-content">
+            <div id="winnerText" class="winner-text"></div>
+            <div id="resultDetails" class="result-details"></div>
+            <button class="btn" onclick="rematch()">Re-match?</button>
+            <button class="btn" onclick="leaveGame()" style="background: #6c757d;">나가기</button>
+        </div>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
     <script>
         // 서버 연결 상태 관리

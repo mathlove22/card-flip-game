@@ -176,7 +176,7 @@ io.on('connection', (socket) => {
             winner = finalWinner ? finalWinner.playerNumber : 'tie';
         }
 
-        console.log(`게임 종료 - 승합: ${winner}, 올킬: ${isAllKill}`);
+        console.log(`게임 종료 - 승자: ${winner}, 올킬: ${isAllKill}`);
 
         io.to(roomCode).emit('gameOver', {
             winner,
