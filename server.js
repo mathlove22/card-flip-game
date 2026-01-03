@@ -7,7 +7,6 @@ app.use(express.static('public'));
 
 const rooms = new Map();
 
-// 초기 보드 생성 (균등 분배)
 function createInitialBoard(playerCount) {
     const board = [];
     const cellsPerPlayer = 36 / playerCount;
@@ -18,7 +17,6 @@ function createInitialBoard(playerCount) {
         }
     }
 
-    // 랜덤 섞기
     for (let i = board.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [board[i], board[j]] = [board[j], board[i]];
@@ -38,15 +36,11 @@ io.on('connection', (socket) => {
         rooms.set(roomCode, {
             board: initialBoard,
             players: [socket.id],
-            clicks: {},
+            clicks: { [socket.id]: 0 },
             gameStarted: false,
+            gameEnded: false,
             timer: null,
             maxPlayers: maxPlayers
-        });
-
-        // 각 플레이어의 클릭 수 초기화
-        socket.id.split('').forEach(() => {
-            rooms.get(roomCode).clicks[socket.id] = 0;
         });
 
         socket.join(roomCode);
@@ -112,6 +106,7 @@ io.on('connection', (socket) => {
         }
 
         room.gameStarted = true;
+        room.gameEnded = false;
         io.to(roomCode).emit('gameStarted');
 
         console.log(`방 ${roomCode}: 게임 시작`);
@@ -121,16 +116,12 @@ io.on('connection', (socket) => {
         }, 30000);
     });
 
-    // 카드 뒤집기 - 순환 로직!
     socket.on('flipCell', ({ roomCode, index }) => {
         const room = rooms.get(roomCode);
 
         if (!room || !room.gameStarted) return;
 
-        // 현재 색에서 다음 색으로 순환 (0 -> 1 -> 2 -> 3 -> 0...)
         room.board[index] = (room.board[index] + 1) % room.maxPlayers;
-
-        // 클릭한 사람의 클릭 수 증가
         room.clicks[socket.id]++;
 
         io.to(roomCode).emit('boardUpdate', {
@@ -139,7 +130,6 @@ io.on('connection', (socket) => {
             clicks: room.clicks
         });
 
-        // 올킬 체크
         const colorCounts = getColorCounts(room.board);
         if (colorCounts.some(count => count === 36)) {
             clearTimeout(room.timer);
@@ -160,6 +150,7 @@ io.on('connection', (socket) => {
         if (!room || !room.gameStarted) return;
 
         room.gameStarted = false;
+        room.gameEnded = true;
 
         const colorCounts = getColorCounts(room.board);
         const scores = room.players.map((playerId, index) => ({
@@ -204,6 +195,7 @@ io.on('connection', (socket) => {
             room.clicks[playerId] = 0;
         });
         room.gameStarted = false;
+        room.gameEnded = false;
 
         io.to(roomCode).emit('rematchStarted', {
             board: room.board
@@ -218,7 +210,11 @@ io.on('connection', (socket) => {
         for (const [roomCode, room] of rooms.entries()) {
             if (room.players.includes(socket.id)) {
                 if (room.timer) clearTimeout(room.timer);
-                socket.to(roomCode).emit('opponentLeft');
+
+                if (!room.gameEnded) {
+                    socket.to(roomCode).emit('opponentLeft');
+                }
+
                 rooms.delete(roomCode);
                 console.log(`방 ${roomCode} 삭제됨`);
                 break;
