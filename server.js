@@ -119,25 +119,34 @@ io.on('connection', (socket) => {
     socket.on('flipCell', ({ roomCode, index }) => {
         const room = rooms.get(roomCode);
 
-        if (!room || !room.gameStarted) return;
+        if (!room || !room.gameStarted || room.gameEnded) return;
 
         room.board[index] = (room.board[index] + 1) % room.maxPlayers;
         room.clicks[socket.id]++;
 
+        // 먼저 보드 업데이트를 모든 클라이언트에 전송
         io.to(roomCode).emit('boardUpdate', {
             board: room.board,
             clickedIndex: index,
             clicks: room.clicks
         });
 
+        console.log(`방 ${roomCode}: 칸 ${index} 뒤집힘`);
+
+        // 올킬 체크
         const colorCounts = getColorCounts(room.board, room.maxPlayers);
         if (colorCounts.some(count => count === 36)) {
-            clearTimeout(room.timer);
             console.log(`🔥 올킬 발생! 방 ${roomCode}`);
+
+            // 타이머 즉시 정리
+            if (room.timer) {
+                clearTimeout(room.timer);
+                room.timer = null;
+            }
+
+            // 게임 즉시 종료
             endGame(roomCode, true);
         }
-
-        console.log(`방 ${roomCode}: 칸 ${index} 뒤집힘`);
     });
 
     function getColorCounts(board, maxPlayers) {
@@ -152,13 +161,23 @@ io.on('connection', (socket) => {
 
     function endGame(roomCode, isAllKill = false) {
         const room = rooms.get(roomCode);
-        if (!room || !room.gameStarted) return;
 
-        // 즉시 게임 시작 상태를 해제하여 중복 실행 방지
-        room.gameStarted = false;
+        // 방이 없거나 이미 종료된 경우 무시
+        if (!room) {
+            console.log(`[endGame] 방을 찾을 수 없음: ${roomCode}`);
+            return;
+        }
+
+        if (room.gameEnded) {
+            console.log(`[endGame] 이미 종료된 게임: ${roomCode}`);
+            return;
+        }
+
+        // 게임 종료 플래그 즉시 설정
         room.gameEnded = true;
+        room.gameStarted = false;
 
-        // 타이머가 남아있다면 확실히 제거
+        // 타이머 확실히 제거
         if (room.timer) {
             clearTimeout(room.timer);
             room.timer = null;
@@ -183,15 +202,25 @@ io.on('connection', (socket) => {
             winner = finalWinner ? finalWinner.playerNumber : 'tie';
         }
 
-        const playerCount = room.players.length;
-        console.log(`[Room ${roomCode}] 게임 종료! 승자: ${winner}, 올킬: ${isAllKill}, 대상 플레이어: ${playerCount}명`);
-
-        // io.to(roomCode)를 사용하여 방 안의 모든 소켓에 전송 확인
-        io.to(roomCode).emit('gameOver', {
+        const gameOverData = {
             winner,
             scores,
             winType: isAllKill ? 'allkill' : 'normal'
+        };
+
+        console.log(`[Room ${roomCode}] 🎮 게임 종료 데이터:`, gameOverData);
+        console.log(`[Room ${roomCode}] 📡 전송 대상 플레이어: ${room.players.length}명`);
+
+        // 각 플레이어에게 개별적으로 전송 (확실한 전달 보장)
+        room.players.forEach(playerId => {
+            io.to(playerId).emit('gameOver', gameOverData);
+            console.log(`[Room ${roomCode}] ✅ gameOver 전송 완료: ${playerId}`);
         });
+
+        // 추가로 방 전체에도 전송 (이중 보장)
+        io.to(roomCode).emit('gameOver', gameOverData);
+
+        console.log(`[Room ${roomCode}] 🏁 게임 종료 완료! 승자: ${winner}, 올킬: ${isAllKill}`);
     }
 
     socket.on('rematch', (roomCode) => {
