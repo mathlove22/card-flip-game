@@ -1541,12 +1541,16 @@
         }
 
         socket.on('gameOver', ({ winner, scores, winType }) => {
-            console.log('📢 서버로부터 gameOver 수신됨:', { winner, scores, winType });
+            console.log('📢 [gameOver] 서버로부터 수신:', { winner, scores, winType, playerNumber });
 
-            if (gameStarted === false && document.getElementById('resultModal').classList.contains('show')) {
-                console.log('이미 결과 화면이 표시 중입니다.');
+            // 모달이 이미 표시 중인지만 체크 (gameStarted 상태는 체크하지 않음!)
+            const resultModal = document.getElementById('resultModal');
+            if (resultModal.classList.contains('show')) {
+                console.log('⚠️ [gameOver] 이미 결과 화면 표시 중, 무시');
                 return;
             }
+
+            console.log('✅ [gameOver] 결과 창 표시 시작');
 
             gameStarted = false;
             clearInterval(timerInterval);
@@ -1606,7 +1610,9 @@
             }
 
             resultDetails.textContent = detailMessage;
-            document.getElementById('resultModal').classList.add('show');
+            resultModal.classList.add('show');
+
+            console.log('✅ [gameOver] 결과 창 표시 완료');
         });
 
         socket.on('rematchStarted', ({ board: newBoard }) => {
