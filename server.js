@@ -154,8 +154,15 @@ io.on('connection', (socket) => {
         const room = rooms.get(roomCode);
         if (!room || !room.gameStarted) return;
 
+        // 즉시 게임 시작 상태를 해제하여 중복 실행 방지
         room.gameStarted = false;
         room.gameEnded = true;
+
+        // 타이머가 남아있다면 확실히 제거
+        if (room.timer) {
+            clearTimeout(room.timer);
+            room.timer = null;
+        }
 
         const colorCounts = getColorCounts(room.board, room.maxPlayers);
         const scores = room.players.map((playerId, index) => ({
@@ -176,15 +183,15 @@ io.on('connection', (socket) => {
             winner = finalWinner ? finalWinner.playerNumber : 'tie';
         }
 
-        console.log(`게임 종료 - 승자: ${winner}, 올킬: ${isAllKill}`);
+        const playerCount = room.players.length;
+        console.log(`[Room ${roomCode}] 게임 종료! 승자: ${winner}, 올킬: ${isAllKill}, 대상 플레이어: ${playerCount}명`);
 
+        // io.to(roomCode)를 사용하여 방 안의 모든 소켓에 전송 확인
         io.to(roomCode).emit('gameOver', {
             winner,
             scores,
             winType: isAllKill ? 'allkill' : 'normal'
         });
-
-        console.log(`방 ${roomCode}: 게임 종료`);
     }
 
     socket.on('rematch', (roomCode) => {

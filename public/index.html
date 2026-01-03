@@ -649,8 +649,60 @@
             margin-bottom: 20px;
         }
 
+        /* 모달 스타일 복구 및 통합 */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            z-index: 3000;
+            /* 최상단 보장 */
+            justify-content: center;
+            align-items: center;
+            backdrop-filter: blur(8px);
+            padding: 20px;
+        }
+
+        .modal.show {
+            display: flex;
+        }
+
+        .modal-content {
+            background: white;
+            padding: 40px;
+            border-radius: 30px;
+            text-align: center;
+            max-width: 450px;
+            width: 100%;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.4);
+            animation: modalPop 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            position: relative;
+        }
+
+        @keyframes modalPop {
+            from {
+                transform: scale(0.8);
+                opacity: 0;
+            }
+
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+
+        .winner-text {
+            font-size: 32px;
+            font-weight: 800;
+            margin-bottom: 20px;
+            line-height: 1.2;
+        }
+
         .winner-text.win {
-            color: #28a745;
+            color: #2ecc71;
         }
 
         .winner-text.lose {
@@ -658,21 +710,20 @@
         }
 
         .winner-text.tie {
-            color: #ffc107;
+            color: #f1c40f;
         }
 
         .result-details {
             font-size: 16px;
-            color: #666;
+            color: #444;
             margin-bottom: 30px;
             white-space: pre-line;
             line-height: 1.8;
             text-align: left;
-            padding: 0 20px;
-        }
-
-        .result-details strong {
-            color: #333;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 15px;
+            border-left: 5px solid #667eea;
         }
 
         /* 올킬 효과 */
@@ -693,7 +744,7 @@
         }
 
         .winner-text.allkill {
-            font-size: 40px;
+            color: #ff3e3e;
             animation: allkillPulse 1s ease infinite;
         }
 
@@ -1490,7 +1541,12 @@
         }
 
         socket.on('gameOver', ({ winner, scores, winType }) => {
-            console.log('게임 종료:', { winner, scores, winType });
+            console.log('📢 서버로부터 gameOver 수신됨:', { winner, scores, winType });
+
+            if (gameStarted === false && document.getElementById('resultModal').classList.contains('show')) {
+                console.log('이미 결과 화면이 표시 중입니다.');
+                return;
+            }
 
             gameStarted = false;
             clearInterval(timerInterval);
