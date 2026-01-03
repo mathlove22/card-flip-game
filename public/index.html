@@ -264,36 +264,6 @@
             color: #0c5460;
         }
 
-        .turn-indicator {
-            background: white;
-            padding: 15px;
-            border-radius: 10px;
-            margin: 15px 0;
-            text-align: center;
-            font-size: 18px;
-            font-weight: bold;
-            border: 3px solid #667eea;
-        }
-
-        .turn-indicator.my-turn {
-            background: #d4edda;
-            border-color: #28a745;
-            color: #155724;
-            animation: turnPulse 1s infinite;
-        }
-
-        @keyframes turnPulse {
-
-            0%,
-            100% {
-                transform: scale(1);
-            }
-
-            50% {
-                transform: scale(1.02);
-            }
-        }
-
         .timer {
             text-align: center;
             font-size: 48px;
@@ -649,7 +619,6 @@
 
         <!-- 게임 화면 -->
         <div id="game" class="hidden">
-            <!-- 공유 섹션 (호스트만 표시) -->
             <div id="shareSection" class="share-section">
                 <div class="room-code-box">
                     <div class="room-code-label">🔢 방 코드</div>
@@ -664,21 +633,12 @@
             </div>
 
             <div id="playerIndicator" class="player-indicator"></div>
-
             <div id="statusMsg" class="status waiting">상대방을 기다리는 중...</div>
-
-            <div id="turnIndicator" class="turn-indicator hidden"></div>
-
             <button id="startBtn" class="btn hidden" onclick="startGame()">게임 시작!</button>
-
             <div id="timerDisplay" class="timer hidden">30</div>
-
             <div class="score-board" id="scoreBoard"></div>
-
             <div class="stats" id="statsDisplay"></div>
-
             <div class="grid" id="grid"></div>
-
             <button class="btn" onclick="leaveGame()">게임 나가기</button>
         </div>
     </div>
@@ -704,13 +664,10 @@
         let currentRoomCode = null;
         let playerNumber = null;
         let maxPlayers = 2;
-        let currentPlayers = 1;
         let board = [];
         let gameStarted = false;
         let timerInterval = null;
         let timeLeft = 30;
-        let currentTurn = 1;
-        let myTurn = false;
 
         const colorNames = ['빨강', '파랑', '노랑', '초록'];
         const colorClasses = ['red', 'blue', 'yellow', 'green'];
@@ -724,14 +681,12 @@
             });
         });
 
-        // 방 생성
         function createRoom() {
             const selectedBtn = document.querySelector('.player-count-btn.selected');
             maxPlayers = parseInt(selectedBtn.dataset.count);
             socket.emit('createRoom', { maxPlayers });
         }
 
-        // 방 참가
         function joinRoom() {
             const roomCode = document.getElementById('roomCodeInput').value.trim().toUpperCase();
             if (roomCode.length !== 6) {
@@ -741,23 +696,19 @@
             socket.emit('joinRoom', roomCode);
         }
 
-        // 게임 시작
         function startGame() {
             socket.emit('startGame', currentRoomCode);
         }
 
-        // 재대결
         function rematch() {
             socket.emit('rematch', currentRoomCode);
             document.getElementById('resultModal').classList.remove('show');
         }
 
-        // 게임 나가기
         function leaveGame() {
             location.reload();
         }
 
-        // 에러 표시
         function showError(msg) {
             const errorDiv = document.getElementById('errorMsg');
             errorDiv.textContent = msg;
@@ -765,13 +716,10 @@
             setTimeout(() => errorDiv.classList.add('hidden'), 3000);
         }
 
-        // QR 코드 생성
         function generateQRCode(roomCode) {
             const qrContainer = document.getElementById('qrcode');
             qrContainer.innerHTML = '';
-
             const gameUrl = `${window.location.origin}?room=${roomCode}`;
-
             new QRCode(qrContainer, {
                 text: gameUrl,
                 width: 160,
@@ -782,18 +730,13 @@
             });
         }
 
-        // 링크 복사
         function copyLink() {
-            const roomCode = currentRoomCode;
-            const gameUrl = `${window.location.origin}?room=${roomCode}`;
-
+            const gameUrl = `${window.location.origin}?room=${currentRoomCode}`;
             navigator.clipboard.writeText(gameUrl).then(() => {
                 const copyBtn = document.querySelector('.copy-btn');
                 const originalText = copyBtn.innerHTML;
-
                 copyBtn.innerHTML = '✓ 복사됨!';
                 copyBtn.classList.add('copied');
-
                 setTimeout(() => {
                     copyBtn.innerHTML = originalText;
                     copyBtn.classList.remove('copied');
@@ -803,46 +746,36 @@
             });
         }
 
-        // URL에서 방 코드 가져오기
         function getRoomCodeFromURL() {
             const urlParams = new URLSearchParams(window.location.search);
             return urlParams.get('room');
         }
 
-        // 페이지 로드 시 자동 참가
         window.addEventListener('load', () => {
             const roomCode = getRoomCodeFromURL();
             if (roomCode) {
                 document.getElementById('roomCodeInput').value = roomCode;
-                setTimeout(() => {
-                    joinRoom();
-                }, 500);
+                setTimeout(() => joinRoom(), 500);
             }
         });
 
-        // 방 생성 완료
         socket.on('roomCreated', ({ roomCode, board: initialBoard, playerNumber: pNum, maxPlayers: max }) => {
             currentRoomCode = roomCode;
             playerNumber = pNum;
             maxPlayers = max;
-            currentPlayers = 1;
             board = initialBoard;
 
             document.getElementById('lobby').classList.add('hidden');
             document.getElementById('game').classList.remove('hidden');
             document.getElementById('roomCodeDisplay').textContent = roomCode;
-
             document.getElementById('shareSection').classList.remove('hidden');
             generateQRCode(roomCode);
-
             updatePlayerIndicator();
             updateScoreBoard();
             initBoard();
-
             document.getElementById('statusMsg').textContent = `대기 중... (1/${maxPlayers})`;
         });
 
-        // 방 참가 완료
         socket.on('roomJoined', ({ roomCode, board: currentBoard, playerNumber: pNum, maxPlayers: max }) => {
             currentRoomCode = roomCode;
             playerNumber = pNum;
@@ -851,43 +784,34 @@
 
             document.getElementById('lobby').classList.add('hidden');
             document.getElementById('game').classList.remove('hidden');
-
             document.getElementById('shareSection').classList.add('hidden');
-
             updatePlayerIndicator();
             updateScoreBoard();
             initBoard();
         });
 
-        // 플레이어 수 업데이트
-        socket.on('playerCountUpdate', ({ currentPlayers: current, maxPlayers: max }) => {
-            currentPlayers = current;
+        socket.on('playerCountUpdate', ({ currentPlayers, maxPlayers: max }) => {
             maxPlayers = max;
+            document.getElementById('statusMsg').textContent = `대기 중... (${currentPlayers}/${max})`;
 
-            document.getElementById('statusMsg').textContent = `대기 중... (${current}/${max})`;
-
-            if (current === max) {
+            if (currentPlayers === max) {
                 document.getElementById('statusMsg').textContent = '모두 참가했습니다! 시작할 수 있습니다.';
                 document.getElementById('statusMsg').className = 'status ready';
-
                 if (playerNumber === 1) {
                     document.getElementById('startBtn').classList.remove('hidden');
                 }
             }
         });
 
-        // 플레이어 표시 업데이트
         function updatePlayerIndicator() {
             const indicator = document.getElementById('playerIndicator');
             indicator.textContent = `당신은 ${colorNames[playerNumber - 1]} (Player ${playerNumber}) 입니다`;
             indicator.className = `player-indicator p${playerNumber}`;
         }
 
-        // 스코어보드 업데이트
         function updateScoreBoard() {
             const scoreBoard = document.getElementById('scoreBoard');
             scoreBoard.innerHTML = '';
-
             for (let i = 0; i < maxPlayers; i++) {
                 const playerDiv = document.createElement('div');
                 playerDiv.className = 'player';
@@ -897,27 +821,26 @@
                 `;
                 scoreBoard.appendChild(playerDiv);
             }
-
             updateScores();
         }
 
-        // 통계 표시 업데이트
         function updateStatsDisplay(clicks) {
             const statsDisplay = document.getElementById('statsDisplay');
             statsDisplay.innerHTML = '';
 
+            // clicks는 socket.id를 키로 가진 객체이므로, 값만 추출
+            const clickArray = Object.values(clicks || {});
+
             for (let i = 0; i < maxPlayers; i++) {
                 const statDiv = document.createElement('div');
-                statDiv.innerHTML = `P${i + 1} 클릭: <span id="player${i + 1}Clicks">${clicks ? (clicks[i] || 0) : 0}</span>`;
+                statDiv.innerHTML = `P${i + 1} 클릭: <span id="player${i + 1}Clicks">${clickArray[i] || 0}</span>`;
                 statsDisplay.appendChild(statDiv);
             }
         }
 
-        // 보드 초기화
         function initBoard() {
             const grid = document.getElementById('grid');
             grid.innerHTML = '';
-
             for (let i = 0; i < 36; i++) {
                 const cell = document.createElement('button');
                 cell.className = 'cell ' + colorClasses[board[i]] + ' disabled';
@@ -925,59 +848,30 @@
                 cell.dataset.index = i;
                 grid.appendChild(cell);
             }
-
             updateScores();
             updateStatsDisplay();
         }
 
-        // 턴 표시 업데이트
-        function updateTurnIndicator() {
-            const turnIndicator = document.getElementById('turnIndicator');
-            turnIndicator.classList.remove('hidden');
-
-            myTurn = (currentTurn === playerNumber);
-
-            if (myTurn) {
-                turnIndicator.textContent = '🎯 당신의 차례입니다!';
-                turnIndicator.className = 'turn-indicator my-turn';
-                enableBoard();
-            } else {
-                turnIndicator.textContent = `${colorNames[currentTurn - 1]} (P${currentTurn})의 차례`;
-                turnIndicator.className = 'turn-indicator';
-                disableBoard();
-            }
-        }
-
-        // 보드 활성화
         function enableBoard() {
-            if (!gameStarted || !myTurn) return;
+            if (!gameStarted) return;
             const cells = document.querySelectorAll('.cell');
             cells.forEach(cell => cell.classList.remove('disabled'));
         }
 
-        // 보드 비활성화
         function disableBoard() {
             const cells = document.querySelectorAll('.cell');
             cells.forEach(cell => cell.classList.add('disabled'));
         }
 
-        // 카드 뒤집기
         function flipCell(index) {
-            if (!gameStarted || !myTurn) return;
-
-            socket.emit('flipCell', {
-                roomCode: currentRoomCode,
-                index
-            });
+            if (!gameStarted) return;
+            socket.emit('flipCell', { roomCode: currentRoomCode, index });
         }
 
-        // 3-2-1 카운트다운
         function showCountdown() {
             const overlay = document.getElementById('countdownOverlay');
             const numberEl = document.getElementById('countdownNumber');
-
             overlay.classList.add('show');
-
             let count = 3;
 
             function displayCount() {
@@ -995,81 +889,65 @@
                     }, 800);
                 }
             }
-
             displayCount();
         }
 
-        // 실제 게임 시작
         function actuallyStartGame() {
             gameStarted = true;
-            currentTurn = 1;
-
             document.getElementById('statusMsg').textContent = '게임 진행 중!';
             document.getElementById('statusMsg').className = 'status playing';
             document.getElementById('startBtn').classList.add('hidden');
             document.getElementById('timerDisplay').classList.remove('hidden');
             document.getElementById('shareSection').classList.add('hidden');
-
-            updateTurnIndicator();
+            enableBoard();
             startTimer();
         }
 
-        // 게임 시작됨
         socket.on('gameStarted', () => {
             showCountdown();
         });
 
-        // 타이머 시작
         function startTimer() {
             timeLeft = 30;
             updateTimerDisplay();
-
             timerInterval = setInterval(() => {
                 timeLeft--;
                 updateTimerDisplay();
-
                 if (timeLeft <= 10) {
                     document.getElementById('timerDisplay').classList.add('warning');
                 }
-
                 if (timeLeft <= 0) {
                     clearInterval(timerInterval);
                 }
             }, 1000);
         }
 
-        // 타이머 표시 업데이트
         function updateTimerDisplay() {
             document.getElementById('timerDisplay').textContent = timeLeft;
         }
 
-        // 보드 업데이트
-        socket.on('boardUpdate', ({ board: newBoard, clickedIndex, clicks, nextTurn }) => {
+        socket.on('boardUpdate', ({ board: newBoard, clickedIndex, clicks }) => {
             board = newBoard;
-            currentTurn = nextTurn;
-
             const cells = document.querySelectorAll('.cell');
             const clickedCell = cells[clickedIndex];
-
             clickedCell.classList.add('flipping');
 
             setTimeout(() => {
                 clickedCell.className = 'cell ' + colorClasses[board[clickedIndex]];
-                if (!gameStarted) {
+                if (gameStarted) {
+                    clickedCell.classList.remove('disabled');
+                } else {
                     clickedCell.classList.add('disabled');
                 }
             }, 300);
 
             updateScores();
             updateStatsDisplay(clicks);
-            updateTurnIndicator();
         });
 
-        // 점수 업데이트
         function updateScores() {
             const colorCounts = Array(maxPlayers).fill(0);
             board.forEach(cell => colorCounts[cell]++);
-
             for (let i = 0; i < maxPlayers; i++) {
                 const scoreEl = document.getElementById(`score${i + 1}`);
                 if (scoreEl) {
@@ -1078,13 +956,10 @@
             }
         }
 
-        // 게임 종료
         socket.on('gameOver', ({ winner, scores, winType }) => {
             gameStarted = false;
             clearInterval(timerInterval);
             disableBoard();
-
-            document.getElementById('turnIndicator').classList.add('hidden');
 
             const winnerText = document.getElementById('winnerText');
             const resultDetails = document.getElementById('resultDetails');
@@ -1112,17 +987,13 @@
             document.getElementById('resultModal').classList.add('show');
         });
 
-        // 재대결 시작
         socket.on('rematchStarted', ({ board: newBoard }) => {
             board = newBoard;
             gameStarted = false;
-            currentTurn = 1;
             timeLeft = 30;
-
             document.getElementById('timerDisplay').textContent = '30';
             document.getElementById('timerDisplay').classList.remove('warning');
             document.getElementById('timerDisplay').classList.add('hidden');
-            document.getElementById('turnIndicator').classList.add('hidden');
 
             if (playerNumber === 1) {
                 document.getElementById('startBtn').classList.remove('hidden');
@@ -1134,13 +1005,11 @@
             initBoard();
         });
 
-        // 상대방 나감
         socket.on('opponentLeft', () => {
             alert('다른 플레이어가 게임을 나갔습니다.');
             location.reload();
         });
 
-        // 에러 처리
         socket.on('error', (msg) => {
             showError(msg);
         });
