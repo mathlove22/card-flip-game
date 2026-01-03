@@ -5,6 +5,15 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>실시간 카드 뒤집기</title>
+
+    <!-- PWA 필수 -->
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#667eea">
+    <link rel="apple-touch-icon" href="/icon-192.png">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="카드게임">
+
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <style>
         /* 서버 연결 로딩 화면 */
@@ -700,6 +709,141 @@
                 font-size: 36px;
             }
         }
+
+        /* 설치 프롬프트 스타일 */
+        .install-prompt {
+            position: fixed;
+            bottom: -300px;
+            left: 0;
+            right: 0;
+            background: white;
+            box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+            z-index: 2500;
+            transition: bottom 0.5s ease;
+            border-radius: 20px 20px 0 0;
+        }
+
+        .install-prompt.show {
+            bottom: 0;
+        }
+
+        .install-prompt-content {
+            padding: 25px;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .install-prompt-header {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+
+        .install-prompt-icon {
+            width: 60px;
+            height: 60px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+        }
+
+        .install-prompt-text h3 {
+            margin: 0 0 5px 0;
+            font-size: 18px;
+            color: #333;
+        }
+
+        .install-prompt-text p {
+            margin: 0;
+            font-size: 14px;
+            color: #666;
+        }
+
+        .install-prompt-buttons {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .install-btn {
+            flex: 1;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .install-btn.primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .install-btn.secondary {
+            background: #f8f9fa;
+            color: #666;
+        }
+
+        .install-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* iOS 설치 안내 */
+        .ios-install-guide {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            z-index: 3000;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+
+        .ios-install-guide.show {
+            display: flex;
+        }
+
+        .ios-install-content {
+            background: white;
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 400px;
+            text-align: center;
+        }
+
+        .ios-install-step {
+            margin: 20px 0;
+            padding: 15px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+
+        .ios-install-step-number {
+            display: inline-block;
+            width: 30px;
+            height: 30px;
+            background: #667eea;
+            color: white;
+            border-radius: 50%;
+            line-height: 30px;
+            margin-bottom: 10px;
+            font-weight: bold;
+        }
+
+        .ios-share-icon {
+            font-size: 40px;
+            margin: 10px 0;
+        }
     </style>
 </head>
 
@@ -766,12 +910,61 @@
     </div>
 
     <!-- 게임 결과 모달 -->
-    <div id="resultModal" class="modal">
-        <div class="modal-content">
-            <div id="winnerText" class="winner-text"></div>
-            <div id="resultDetails" class="result-details"></div>
-            <button class="btn" onclick="rematch()">Re-match?</button>
-            <button class="btn" onclick="leaveGame()" style="background: #6c757d;">나가기</button>
+    <!-- 🔥 Android/PC 설치 프롬프트 🔥 -->
+    <div id="installPrompt" class="install-prompt">
+        <div class="install-prompt-content">
+            <div class="install-prompt-header">
+                <div class="install-prompt-icon">🎮</div>
+                <div class="install-prompt-text">
+                    <h3>홈 화면에 추가</h3>
+                    <p>앱처럼 빠르게 접속하세요!</p>
+                </div>
+            </div>
+            <div class="install-prompt-buttons">
+                <button class="install-btn primary" onclick="installApp()">
+                    ✨ 추가하기
+                </button>
+                <button class="install-btn secondary" onclick="dismissInstallPrompt()">
+                    나중에
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 🔥 iOS 설치 안내 🔥 -->
+    <div id="iosInstallGuide" class="ios-install-guide">
+        <div class="ios-install-content">
+            <h2 style="margin-bottom: 20px;">📱 홈 화면에 추가</h2>
+
+            <div class="ios-install-step">
+                <div class="ios-install-step-number">1</div>
+                <p>Safari 하단의 공유 버튼을 누르세요</p>
+                <div class="ios-share-icon">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <path d="M12 5V19M12 5L6 11M12 5L18 11" stroke="#667eea" stroke-width="2" stroke-linecap="round"
+                            stroke-linejoin="round" />
+                        <path
+                            d="M19 12V19C19 19.5304 18.7893 20.0391 18.4142 20.4142C18.0391 20.7893 17.5304 21 17 21H7C6.46957 21 5.96086 20.7893 5.58579 20.4142C5.21071 20.0391 5 19.5304 5 19V12"
+                            stroke="#667eea" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="ios-install-step">
+                <div class="ios-install-step-number">2</div>
+                <p>"홈 화면에 추가"를 선택하세요</p>
+                <div style="font-size: 24px; margin: 10px 0;">➕</div>
+            </div>
+
+            <div class="ios-install-step">
+                <div class="ios-install-step-number">3</div>
+                <p>홈 화면에서 앱처럼 사용하세요!</p>
+                <div style="font-size: 24px; margin: 10px 0;">🎉</div>
+            </div>
+
+            <button class="btn" onclick="closeIosInstallGuide()" style="margin-top: 20px;">
+                확인
+            </button>
         </div>
     </div>
 
@@ -804,6 +997,107 @@
                 clearTimeout(connectionTimeout);
             }
         }
+
+        // 🔥 PWA 설치 관리 🔥
+        let deferredPrompt;
+        let installPromptShown = false;
+
+        // Service Worker 등록
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('✅ Service Worker 등록:', reg))
+                    .catch(err => console.log('❌ Service Worker 실패:', err));
+            });
+        }
+
+        // beforeinstallprompt 이벤트 캡처 (Android/PC)
+        window.addEventListener('beforeinstallprompt', (e) => {
+            console.log('📱 설치 프롬프트 준비됨');
+            e.preventDefault();
+            deferredPrompt = e;
+
+            // 이미 설치됨 체크
+            if (!localStorage.getItem('installDismissed')) {
+                checkAndShowInstallPrompt();
+            }
+        });
+
+        // 설치 프롬프트 표시 타이밍
+        function checkAndShowInstallPrompt() {
+            const gamesPlayed = parseInt(localStorage.getItem('gamesPlayed') || '0');
+
+            // 첫 게임 종료 후 표시
+            if (gamesPlayed >= 1 && !installPromptShown) {
+                setTimeout(() => {
+                    showInstallPrompt();
+                }, 3000); // 3초 후
+            }
+        }
+
+        // 설치 프롬프트 표시
+        function showInstallPrompt() {
+            const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+            const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+
+            // 이미 설치됨
+            if (isStandalone) {
+                console.log('✅ 이미 설치됨');
+                return;
+            }
+
+            if (isIOS) {
+                // iOS: 안내 모달 표시
+                document.getElementById('iosInstallGuide').classList.add('show');
+                installPromptShown = true;
+            } else if (deferredPrompt) {
+                // Android/PC: 네이티브 프롬프트
+                document.getElementById('installPrompt').classList.add('show');
+                installPromptShown = true;
+            }
+        }
+
+        // 앱 설치 (Android/PC)
+        async function installApp() {
+            if (!deferredPrompt) {
+                return;
+            }
+
+            document.getElementById('installPrompt').classList.remove('show');
+
+            deferredPrompt.prompt();
+            const { outcome } = await deferredPrompt.userChoice;
+
+            console.log(`설치 결과: ${outcome}`);
+
+            if (outcome === 'accepted') {
+                console.log('✅ 사용자가 설치함');
+            }
+
+            deferredPrompt = null;
+        }
+
+        // 나중에
+        function dismissInstallPrompt() {
+            document.getElementById('installPrompt').classList.remove('show');
+            localStorage.setItem('installDismissed', Date.now());
+
+            // 7일 후 다시 표시
+            setTimeout(() => {
+                localStorage.removeItem('installDismissed');
+            }, 7 * 24 * 60 * 60 * 1000);
+        }
+
+        // iOS 안내 닫기
+        function closeIosInstallGuide() {
+            document.getElementById('iosInstallGuide').classList.remove('show');
+            localStorage.setItem('installDismissed', Date.now());
+        }
+
+        // 설치 완료 감지
+        window.addEventListener('appinstalled', () => {
+            console.log('✅ 앱 설치 완료!');
+        });
 
         const socket = io();
 
@@ -1139,6 +1433,18 @@
             gameStarted = false;
             clearInterval(timerInterval);
             disableBoard();
+
+            // 게임 카운트 증가 및 PWA 설치 유도
+            let gamesPlayed = parseInt(localStorage.getItem('gamesPlayed') || '0');
+            gamesPlayed++;
+            localStorage.setItem('gamesPlayed', gamesPlayed);
+
+            // 첫 게임 후 설치 프롬프트 표시
+            if (gamesPlayed === 1 && !installPromptShown) {
+                setTimeout(() => {
+                    showInstallPrompt();
+                }, 5000); // 결과 확인 후 5초 뒤
+            }
 
             const winnerText = document.getElementById('winnerText');
             const resultDetails = document.getElementById('resultDetails');
