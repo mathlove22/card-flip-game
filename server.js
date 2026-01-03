@@ -10,6 +10,22 @@ app.use(express.static('public'));
 // 게임 방 관리
 const rooms = new Map();
 
+// 초기 보드 생성 함수 (18:18 균등)
+function createInitialBoard() {
+    const board = [];
+    // 18개 빨강(0), 18개 파랑(1)
+    for (let i = 0; i < 18; i++) {
+        board.push(0); // 빨강
+        board.push(1); // 파랑
+    }
+    // 랜덤 섞기
+    for (let i = board.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [board[i], board[j]] = [board[j], board[i]];
+    }
+    return board;
+}
+
 io.on('connection', (socket) => {
     console.log('사용자 연결:', socket.id);
 
@@ -17,8 +33,8 @@ io.on('connection', (socket) => {
     socket.on('createRoom', () => {
         const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-        // 초기 보드 생성 (랜덤)
-        const initialBoard = Array(36).fill(0).map(() => Math.random() > 0.5 ? 0 : 1);
+        // 초기 보드 생성 (18:18)
+        const initialBoard = createInitialBoard();
 
         rooms.set(roomCode, {
             board: initialBoard,
@@ -130,11 +146,21 @@ io.on('connection', (socket) => {
             clicks: room.clicks
         });
 
-        console.log(`방 ${roomCode}: 칸 ${index} 뒤집힘`);
+        // 36칸 올킬 체크
+        const redCount = room.board.filter(cell => cell === 0).length;
+        const blueCount = 36 - redCount;
+
+        if (redCount === 36 || blueCount === 36) {
+            // 즉시 게임 종료
+            clearTimeout(room.timer);
+            endGame(roomCode, true); // 올킬 플래그 전달
+        }
+
+        console.log(`방 ${roomCode}: 칸 ${index} 뒤집힘 (빨강:${redCount}, 파랑:${blueCount})`);
     });
 
     // 게임 종료 함수
-    function endGame(roomCode) {
+    function endGame(roomCode, isAllKill = false) {
         const room = rooms.get(roomCode);
         if (!room || !room.gameStarted) return;
 
@@ -148,6 +174,7 @@ io.on('connection', (socket) => {
         const p2Clicks = room.clicks[room.players[1]] || 0;
 
         let winner = '';
+        let winType = isAllKill ? 'allkill' : 'normal';
 
         // 승자 결정
         if (redScore > blueScore) {
@@ -171,10 +198,11 @@ io.on('connection', (socket) => {
             redScore,
             blueScore,
             p1Clicks,
-            p2Clicks
+            p2Clicks,
+            winType
         });
 
-        console.log(`방 ${roomCode}: 게임 종료 - 승자: ${winner}`);
+        console.log(`방 ${roomCode}: 게임 종료 - 승자: ${winner} (${winType})`);
     }
 
     // 재대결
@@ -192,8 +220,8 @@ io.on('connection', (socket) => {
             room.timer = null;
         }
 
-        // 보드 및 게임 상태 초기화
-        room.board = Array(36).fill(0).map(() => Math.random() > 0.5 ? 0 : 1);
+        // 보드 및 게임 상태 초기화 (18:18)
+        room.board = createInitialBoard();
         room.clicks = {};
         room.players.forEach(playerId => {
             room.clicks[playerId] = 0;
